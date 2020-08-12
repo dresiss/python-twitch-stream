@@ -102,9 +102,7 @@ class TwitchChatStream(object):
         :type data: list of bytes
         :return: returns iterator over these messages
         """
-        return re.match(r'^:[a-zA-Z0-9_]+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+'
-                        r'\.tmi\.twitch\.tv '
-                        r'PRIVMSG #[a-zA-Z0-9_]+ :.+$', data)
+        return data.find('PRIVMSG')
 
     def connect(self):
         """
@@ -181,6 +179,19 @@ class TwitchChatStream(object):
         if len(message) > 0:
             self.buffer.append(message + "\n")
 
+    def _cap(self, req):
+        """
+        Send CAP REQ command to the IRC stream
+
+        available reqs:
+        tags
+        commands
+        membership
+        :param req: the req to be sent.
+        :type req: string
+        """
+        self.s.send('CAP REQ :twitch.tv/' + req + '\r\n')
+
     def _send_pong(self):
         """
         Send a pong message, usually in reply to a received ping message
@@ -220,16 +231,12 @@ class TwitchChatStream(object):
             self.current_channel = \
                 TwitchChatStream._check_has_channel(data)[0]
 
-        if TwitchChatStream._check_has_message(data):
+        if TwitchChatStream._check_has_message(data) <> -1:
             return {
-                'channel': re.findall(r'^:.+![a-zA-Z0-9_]+'
-                                      r'@[a-zA-Z0-9_]+'
-                                      r'.+ '
-                                      r'PRIVMSG (.*?) :',
-                                      data)[0],
-                'username': re.findall(r'^:([a-zA-Z0-9_]+)!', data)[0],
-                'message': re.findall(r'PRIVMSG #[a-zA-Z0-9_]+ :(.+)',
-                                      data)[0].decode('utf8')
+                'tags': data.split(':')[0],
+                'username': data.split(':')[1].split('!')[0],
+                'channel': data.split('#')[1].split(' ')[0],
+                'message': data.split(':')[2]
             }
         else:
             return None
